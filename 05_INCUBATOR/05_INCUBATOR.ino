@@ -6,11 +6,13 @@ Adafruit_Si7021 sensor = Adafruit_Si7021();
 //Library version:1.1
 #include <Wire.h> 
 #include <LiquidCrystal_I2C.h>
+LiquidCrystal_I2C lcd(0x27,20,4);
 
 int relay_01 = 9;
 int relay_02 = 8;
+int high = 7;
 
-LiquidCrystal_I2C lcd(0x27,20,4);
+
 void setup() {
   Serial.begin(115200);
   lcd.init();
@@ -50,21 +52,24 @@ void setup() {
 
   pinMode(relay_01, OUTPUT);
   pinMode(relay_02, OUTPUT);
+  digitalWrite(relay_02, HIGH); // initialize tilt off
+  digitalWrite(high, HIGH); // use to correct tilt
 }
 
 bool start {true};
 void loop() 
 {
   run_time();
+  print_temp();
   if(start == true)
   {
-    Slow_start();
+    Slow_start(); // slowly reach 37 degree celcius
   }
   else
   {
-    maintain_temp_within_range();
+    maintain_temp_within_range(); // maintain 37 - 38 degree celcius
   }
-  print_temp();
+  tilt();
 }
 
 int seconds {0};
@@ -79,18 +84,29 @@ void run_time()
   }
 }
 
+bool start_tilting {false};
 void tilt()
 {
-  if(seconds%18000 == 0)
+  if(seconds%18000 == 0 || start_tilting == true)
   {
     //tilt
-    digitalWrite(relay_02, LOW); // On
+    if(seconds%10 == 0)
+    {
+      start_tilting = true;
+      digitalWrite(relay_02, LOW); // On
+    }
+    if(seconds%9 == 0)
+    {
+      digitalWrite(relay_02, HIGH); // off
+      start_tilting = false;
+    }   
   }
+
 }
 
 void print_temp()
 {
-  if(seconds%1 == 0) // runs code every second
+  if(seconds%1 == 0) // runs code every millis() second
   {
     lcd.setCursor(0,0);
     lcd.print("Humidity:");
@@ -109,7 +125,7 @@ void maintain_temp_within_range() // average 1 min ON,and then OFF for average 5
                                   // 200 watts heater ON for ave 5 hours a day. 300 pesos for 25 days of use
 {
 
-  if(sensor.readTemperature() > 37.5)// temp rise up to 38.12 ~ 38.21
+  if(sensor.readTemperature() > 37.5)// temp rise up to 38.12 ~ 38.22
   {
     digitalWrite(relay_01, HIGH); // Off
     lcd.setCursor(0,3);
